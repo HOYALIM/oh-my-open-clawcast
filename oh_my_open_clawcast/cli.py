@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from .aggregator import UsageAggregator
+from .formatter import render_clawcast_message
 from .forecast import (
     apply_cost_estimation,
     daily_token_moving_average,
@@ -19,8 +21,15 @@ from .forecast import (
     rate_table_to_dataframe,
 )
 from .loader import load_cron_runs
+from .quota import QuotaResolver
 from .rates import DEFAULT_MODEL_RATES, ModelRate
 from .report import render_html_report
+
+
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--dir", help="OpenClaw state dir (defaults to env or ~/.openclaw)")
+    parser.add_argument("--rates", help="JSON file with model pricing table")
+    parser.add_argument("--job", help="Optional cron job id filter")
 
 
 def _load_rate_file(path: str | None) -> Dict[str, ModelRate]:
@@ -108,15 +117,74 @@ def cmd_table(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_message(args: argparse.Namespace) -> int:
+    rates = _load_rate_file(args.rates)
+    df = load_cron_runs(openclaw_dir=args.dir, job_id=args.job)
+    if df.empty:
+        print("No cron run logs found.")
+        return 1
+
+    tz_name = args.tz or "UTC"
+    now_local = datetime.now(ZoneInfo(tz_name))
+
+    agg = UsageAggregator(
+        df=df,
+        tz=tz_name,
+        rates=rates,
+    )
+    daily = agg.daily()
+    mtd = agg.mtd()
+    forecast = agg.forecast(lookback_days=args.lookback)
+    alerts = agg.alerts(z_threshold=args.z_threshold, failure_sigma=args.failure_sigma)
+
+    model_keys: list[tuple[str, str, str]] = []
+    for row in daily.by_model[: args.max_models]:
+        provider = str(row.get("provider") or "")
+        model = str(row.get("model") or "")
+        auth_mode = str(row.get("auth_mode") or "api")
+        if provider and model:
+            model_keys.append((provider, model, auth_mode))
+
+    # Fill from MTD when today is sparse.
+    if len(model_keys) < args.max_models:
+        for row in mtd.by_model:
+            provider = str(row.get("provider") or "")
+            model = str(row.get("model") or "")
+            auth_mode = str(row.get("auth_mode") or "api")
+            candidate = (provider, model, auth_mode)
+            if provider and model and candidate not in model_keys:
+                model_keys.append(candidate)
+            if len(model_keys) >= args.max_models:
+                break
+
+    quota = QuotaResolver(
+        cache_ttl_seconds=args.quota_cache_ttl,
+        live_file=args.quota_live_file,
+        manual_file=args.quota_manual_file,
+    )
+    quotas = quota.resolve_all(model_keys)
+
+    message = render_clawcast_message(
+        now_local=now_local,
+        timezone_name=tz_name,
+        daily=daily,
+        mtd=mtd,
+        forecast=forecast,
+        quotas=quotas,
+        alerts=alerts,
+    )
+    print(message)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="clawcast", description="Oh My Open Clawcast telemetry forecast toolkit")
-    p.add_argument("--dir", help="OpenClaw state dir (defaults to env or ~/.openclaw)")
-    p.add_argument("--rates", help="JSON file with model pricing table")
-    p.add_argument("--job", help="Optional cron job id filter")
+    _add_common_args(p)
 
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd")
 
     rep = sub.add_parser("report", help="Generate full HTML forecast report")
+    _add_common_args(rep)
     rep.add_argument("--out", default="examples/forecast_report.html")
     rep.add_argument("--lookback", type=int, default=14)
     rep.add_argument("--z-threshold", type=float, default=2.5)
@@ -124,10 +192,23 @@ def build_parser() -> argparse.ArgumentParser:
     rep.set_defaults(func=cmd_report)
 
     tbl = sub.add_parser("table", help="Print analysis table")
+    _add_common_args(tbl)
     tbl.add_argument("what", choices=["latency", "cost", "ma", "anomaly", "rates"])
     tbl.add_argument("--z-threshold", type=float, default=2.5)
     tbl.add_argument("--failure-sigma", type=float, default=2.0)
     tbl.set_defaults(func=cmd_table)
+
+    msg = sub.add_parser("message", help="Print messenger-friendly /clawcast default summary text")
+    _add_common_args(msg)
+    msg.add_argument("--tz", default="UTC", help="Timezone for daily/month boundaries, e.g. Asia/Seoul")
+    msg.add_argument("--lookback", type=int, default=14, help="Forecast lookback days")
+    msg.add_argument("--z-threshold", type=float, default=2.5)
+    msg.add_argument("--failure-sigma", type=float, default=2.0)
+    msg.add_argument("--max-models", type=int, default=6)
+    msg.add_argument("--quota-live-file", help="JSON file with live quota snapshots")
+    msg.add_argument("--quota-manual-file", help="JSON file with manual quota limits")
+    msg.add_argument("--quota-cache-ttl", type=int, default=300)
+    msg.set_defaults(func=cmd_message)
 
     return p
 
@@ -135,6 +216,15 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.cmd is None:
+        # Default: run message subcommand with defaults
+        defaults = parser.parse_args(["message"])
+        # Merge any top-level args (--dir, --rates, --job) into defaults
+        for key in ("dir", "rates", "job"):
+            val = getattr(args, key, None)
+            if val is not None:
+                setattr(defaults, key, val)
+        args = defaults
     return int(args.func(args))
 
 

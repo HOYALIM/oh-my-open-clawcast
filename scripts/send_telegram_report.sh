@@ -20,6 +20,10 @@ OUT_DIR="${OUT_DIR:-${ROOT_DIR}/out}"
 RATES_FILE="${RATES_FILE:-}"
 ALLOW_DEMO_FALLBACK="${ALLOW_DEMO_FALLBACK:-1}"
 DRY_RUN="${DRY_RUN:-0}"
+TZ_NAME="${TZ_NAME:-UTC}"
+QUOTA_LIVE_FILE="${QUOTA_LIVE_FILE:-}"
+QUOTA_MANUAL_FILE="${QUOTA_MANUAL_FILE:-}"
+SEND_REPORT_DOC="${SEND_REPORT_DOC:-1}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 REPORT_HTML="${REPORT_HTML:-${OUT_DIR}/clawcast_${STAMP}.html}"
 
@@ -27,10 +31,16 @@ mkdir -p "${OUT_DIR}"
 source "${VENV_ACTIVATE}"
 
 REPORT_CMD=(clawcast report --dir "${OPENCLAW_DIR}" --out "${REPORT_HTML}")
-ANOMALY_CMD=(clawcast table anomaly --dir "${OPENCLAW_DIR}")
+MESSAGE_CMD=(clawcast message --dir "${OPENCLAW_DIR}" --tz "${TZ_NAME}")
 if [[ -n "${RATES_FILE}" ]]; then
   REPORT_CMD+=(--rates "${RATES_FILE}")
-  ANOMALY_CMD+=(--rates "${RATES_FILE}")
+  MESSAGE_CMD+=(--rates "${RATES_FILE}")
+fi
+if [[ -n "${QUOTA_LIVE_FILE}" ]]; then
+  MESSAGE_CMD+=(--quota-live-file "${QUOTA_LIVE_FILE}")
+fi
+if [[ -n "${QUOTA_MANUAL_FILE}" ]]; then
+  MESSAGE_CMD+=(--quota-manual-file "${QUOTA_MANUAL_FILE}")
 fi
 
 REPORT_MODE="live"
@@ -46,30 +56,33 @@ if ! "${REPORT_CMD[@]}" >/tmp/clawcast_report_stdout.txt 2>/tmp/clawcast_report_
   fi
 fi
 
-ANOMALY_TEXT="$("${ANOMALY_CMD[@]}" 2>&1 || true)"
-if [[ -z "${ANOMALY_TEXT}" ]]; then
-  ANOMALY_TEXT="(No anomaly rows or no run logs found.)"
+MESSAGE_TEXT="$("${MESSAGE_CMD[@]}" 2>&1 || true)"
+if [[ -z "${MESSAGE_TEXT}" ]]; then
+  MESSAGE_TEXT="[Clawcast] no output"
 fi
 
-MESSAGE="[Clawcast] ${REPORT_MODE} report ready
-Host: $(hostname)
-Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+if [[ "${REPORT_MODE}" == "demo" ]]; then
+  MESSAGE_TEXT="${MESSAGE_TEXT}
 
-Anomaly summary:
-${ANOMALY_TEXT}"
+Note: demo fallback mode (live logs missing)"
+fi
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "[DRY_RUN] Would send Telegram message to chat ${TELEGRAM_CHAT_ID}"
+  echo "[DRY_RUN] Message preview:"
+  echo "${MESSAGE_TEXT}" | sed -n '1,40p'
   echo "[DRY_RUN] Report file: ${REPORT_HTML}"
   exit 0
 fi
 
 curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
   -d "chat_id=${TELEGRAM_CHAT_ID}" \
-  --data-urlencode "text=${MESSAGE}" >/tmp/clawcast_tg_message_resp.json
+  --data-urlencode "text=${MESSAGE_TEXT}" >/tmp/clawcast_tg_message_resp.json
 
-curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-  -F "chat_id=${TELEGRAM_CHAT_ID}" \
-  -F "document=@${REPORT_HTML}" >/tmp/clawcast_tg_doc_resp.json
+if [[ "${SEND_REPORT_DOC}" == "1" ]]; then
+  curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+    -F "chat_id=${TELEGRAM_CHAT_ID}" \
+    -F "document=@${REPORT_HTML}" >/tmp/clawcast_tg_doc_resp.json
+fi
 
 echo "Sent Telegram report: ${REPORT_HTML}"

@@ -34,6 +34,19 @@ clawcast table latency --dir ~/.openclaw
 
 # full HTML report
 clawcast report --dir ~/.openclaw --out examples/forecast_report.html
+
+# messenger default summary text (/clawcast output payload)
+clawcast message --dir ~/.openclaw --tz Asia/Seoul
+```
+
+With quota snapshots:
+
+```bash
+clawcast message \
+  --dir ~/.openclaw \
+  --tz Asia/Seoul \
+  --quota-live-file examples/quota_live.sample.json \
+  --quota-manual-file examples/quota_manual.sample.json
 ```
 
 ## Custom price table
@@ -102,6 +115,23 @@ Notes:
 1. If live OpenClaw logs are missing, scripts fall back to demo report generation by default.
 2. Set `ALLOW_DEMO_FALLBACK=0` to force live-log-only behavior.
 3. Set `DRY_RUN=1` to test end-to-end without sending any external requests.
+
+## Slash-command mapping
+
+When your Telegram/Slack bot receives `/clawcast`, call:
+
+```bash
+clawcast message --dir ~/.openclaw --tz Asia/Seoul --quota-live-file quota_live.json --quota-manual-file quota_manual.json
+```
+
+The output already includes:
+
+1. Today usage (from local 00:00)
+2. Month-to-date usage (from 1st day 00:00)
+3. Model/auth mode (API vs OAuth), tokens, cost, latency p50/p95
+4. Month-end projection
+5. Quota status with confidence (`live`/`cached`/`manual`)
+6. Alerts
 
 ## Recommended multi-AI workflow (you + Codex + Claude Code + Gemini)
 

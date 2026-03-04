@@ -11,6 +11,47 @@ import pandas as pd
 DEFAULT_OPENCLAW_DIR = Path.home() / ".openclaw"
 
 
+def _pick_first_str(*values: Any) -> Optional[str]:
+    for raw in values:
+        if isinstance(raw, str):
+            text = raw.strip()
+            if text:
+                return text
+    return None
+
+
+def infer_auth_mode(entry: Dict[str, Any], provider: Any, model: Any) -> str:
+    usage = entry.get("usage") or {}
+    meta = entry.get("meta") or {}
+    auth = entry.get("auth") or {}
+
+    if entry.get("oauth") is True:
+        return "oauth"
+
+    explicit = _pick_first_str(
+        entry.get("authMode"),
+        entry.get("auth_mode"),
+        usage.get("authMode") if isinstance(usage, dict) else None,
+        usage.get("auth_mode") if isinstance(usage, dict) else None,
+        meta.get("authMode") if isinstance(meta, dict) else None,
+        meta.get("auth_mode") if isinstance(meta, dict) else None,
+        auth.get("mode") if isinstance(auth, dict) else None,
+        entry.get("oauth") if isinstance(entry.get("oauth"), str) else None,
+    )
+    if explicit:
+        lowered = explicit.lower()
+        if "oauth" in lowered:
+            return "oauth"
+        if "api" in lowered or "key" in lowered:
+            return "api"
+
+    provider_text = str(provider or "").lower()
+    model_text = str(model or "").lower()
+    if "oauth" in provider_text or "oauth" in model_text:
+        return "oauth"
+    return "api"
+
+
 def resolve_openclaw_dir(base: Optional[str] = None) -> Path:
     if base:
         return Path(base)
@@ -69,6 +110,7 @@ def empty_cron_df() -> pd.DataFrame:
             "delivery_status",
             "delivery_error",
             "session_id",
+            "auth_mode",
         ]
     )
 
@@ -94,6 +136,8 @@ def load_cron_runs(openclaw_dir: Optional[str] = None, job_id: Optional[str] = N
             if not isinstance(ts, (int, float)):
                 continue
             usage = entry.get("usage") or {}
+            provider = entry.get("provider")
+            model = entry.get("model")
             rows.append(
                 {
                     "timestamp": _ts_to_datetime(ts),
@@ -104,8 +148,8 @@ def load_cron_runs(openclaw_dir: Optional[str] = None, job_id: Optional[str] = N
                     "error": entry.get("error"),
                     "summary": entry.get("summary"),
                     "duration_ms": entry.get("durationMs"),
-                    "model": entry.get("model"),
-                    "provider": entry.get("provider"),
+                    "model": model,
+                    "provider": provider,
                     "input_tokens": usage.get("input_tokens"),
                     "output_tokens": usage.get("output_tokens"),
                     "cache_read_tokens": usage.get("cache_read_tokens"),
@@ -114,6 +158,7 @@ def load_cron_runs(openclaw_dir: Optional[str] = None, job_id: Optional[str] = N
                     "delivery_status": entry.get("deliveryStatus"),
                     "delivery_error": entry.get("deliveryError"),
                     "session_id": entry.get("sessionId"),
+                    "auth_mode": infer_auth_mode(entry, provider=provider, model=model),
                 }
             )
 

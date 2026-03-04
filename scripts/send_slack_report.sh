@@ -20,6 +20,9 @@ OUT_DIR="${OUT_DIR:-${ROOT_DIR}/out}"
 RATES_FILE="${RATES_FILE:-}"
 ALLOW_DEMO_FALLBACK="${ALLOW_DEMO_FALLBACK:-1}"
 DRY_RUN="${DRY_RUN:-0}"
+TZ_NAME="${TZ_NAME:-UTC}"
+QUOTA_LIVE_FILE="${QUOTA_LIVE_FILE:-}"
+QUOTA_MANUAL_FILE="${QUOTA_MANUAL_FILE:-}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 REPORT_HTML="${REPORT_HTML:-${OUT_DIR}/clawcast_${STAMP}.html}"
 REPORT_PUBLIC_URL="${REPORT_PUBLIC_URL:-}"
@@ -28,10 +31,16 @@ mkdir -p "${OUT_DIR}"
 source "${VENV_ACTIVATE}"
 
 REPORT_CMD=(clawcast report --dir "${OPENCLAW_DIR}" --out "${REPORT_HTML}")
-ANOMALY_CMD=(clawcast table anomaly --dir "${OPENCLAW_DIR}")
+MESSAGE_CMD=(clawcast message --dir "${OPENCLAW_DIR}" --tz "${TZ_NAME}")
 if [[ -n "${RATES_FILE}" ]]; then
   REPORT_CMD+=(--rates "${RATES_FILE}")
-  ANOMALY_CMD+=(--rates "${RATES_FILE}")
+  MESSAGE_CMD+=(--rates "${RATES_FILE}")
+fi
+if [[ -n "${QUOTA_LIVE_FILE}" ]]; then
+  MESSAGE_CMD+=(--quota-live-file "${QUOTA_LIVE_FILE}")
+fi
+if [[ -n "${QUOTA_MANUAL_FILE}" ]]; then
+  MESSAGE_CMD+=(--quota-manual-file "${QUOTA_MANUAL_FILE}")
 fi
 
 REPORT_MODE="live"
@@ -47,9 +56,14 @@ if ! "${REPORT_CMD[@]}" >/tmp/clawcast_report_stdout.txt 2>/tmp/clawcast_report_
   fi
 fi
 
-ANOMALY_TEXT="$("${ANOMALY_CMD[@]}" 2>&1 || true)"
-if [[ -z "${ANOMALY_TEXT}" ]]; then
-  ANOMALY_TEXT="(No anomaly rows or no run logs found.)"
+MESSAGE_TEXT="$("${MESSAGE_CMD[@]}" 2>&1 || true)"
+if [[ -z "${MESSAGE_TEXT}" ]]; then
+  MESSAGE_TEXT="[Clawcast] no output"
+fi
+if [[ "${REPORT_MODE}" == "demo" ]]; then
+  MESSAGE_TEXT="${MESSAGE_TEXT}
+
+Note: demo fallback mode (live logs missing)"
 fi
 
 MSG_HEADER="[Clawcast] ${REPORT_MODE} report ready on $(hostname) at $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
@@ -59,22 +73,26 @@ fi
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "[DRY_RUN] Would send Slack report."
+  echo "[DRY_RUN] Message preview:"
+  echo "${MESSAGE_TEXT}" | sed -n '1,40p'
   echo "[DRY_RUN] Report file: ${REPORT_HTML}"
   exit 0
 fi
 
 if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-  ESCAPED_TEXT="${MSG_HEADER}\n\nAnomaly summary:\n\`\`\`${ANOMALY_TEXT}\`\`\`"
+  ESCAPED_TEXT="${MSG_HEADER}\n\n\`\`\`${MESSAGE_TEXT}\`\`\`"
   curl -fsS -X POST -H "Content-type: application/json" \
     --data "{\"text\":\"${ESCAPED_TEXT//$'\n'/\\n}\"}" \
     "${SLACK_WEBHOOK_URL}" >/tmp/clawcast_slack_webhook_resp.txt
 fi
 
 if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_CHANNEL:-}" ]]; then
+  SHORT_MESSAGE="$(echo "${MESSAGE_TEXT}" | head -n 20)"
   curl -fsS "https://slack.com/api/files.upload" \
     -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
     -F "channels=${SLACK_CHANNEL}" \
-    -F "initial_comment=${MSG_HEADER}" \
+    -F "initial_comment=${MSG_HEADER}
+${SHORT_MESSAGE}" \
     -F "file=@${REPORT_HTML}" >/tmp/clawcast_slack_upload_resp.json
 fi
 

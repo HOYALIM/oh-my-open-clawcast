@@ -1,0 +1,12 @@
+{
+  "openai/gpt-4o|api": {
+    "limit_tokens": 5000000,
+    "used_tokens": 1320450,
+    "updated_at": "2026-03-04T10:00:00Z"
+  },
+  "anthropic/claude-sonnet-4-5|oauth": {
+    "limit_tokens": 2000000,
+    "used_tokens": 940120,
+    "updated_at": "2026-03-04T10:00:00Z"
+  }
+}
