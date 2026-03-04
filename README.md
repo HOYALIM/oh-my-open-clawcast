@@ -66,6 +66,43 @@ clawcast report --rates rates.json --out examples/forecast_report_custom_rates.h
 - HTML report: `examples/forecast_report.html`
 - Notebook workflow: `notebooks/forecast_demo.ipynb`
 
+## Telegram / Slack delivery
+
+Use helper scripts to generate a report and post it to chat.
+
+```bash
+chmod +x scripts/send_telegram_report.sh scripts/send_slack_report.sh
+```
+
+Telegram:
+
+```bash
+export TELEGRAM_BOT_TOKEN="123456:abc..."
+export TELEGRAM_CHAT_ID="-100xxxxxxxxxx"   # group/channel/chat id
+./scripts/send_telegram_report.sh
+```
+
+Slack (webhook summary):
+
+```bash
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+./scripts/send_slack_report.sh
+```
+
+Slack (file upload):
+
+```bash
+export SLACK_BOT_TOKEN="xoxb-..."
+export SLACK_CHANNEL="C0123456789"
+./scripts/send_slack_report.sh
+```
+
+Notes:
+
+1. If live OpenClaw logs are missing, scripts fall back to demo report generation by default.
+2. Set `ALLOW_DEMO_FALLBACK=0` to force live-log-only behavior.
+3. Set `DRY_RUN=1` to test end-to-end without sending any external requests.
+
 ## Recommended multi-AI workflow (you + Codex + Claude Code + Gemini)
 
 ### Role split
