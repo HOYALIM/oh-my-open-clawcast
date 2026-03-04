@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from openclaw_telemetry_forecast.forecast import (
+from oh_my_open_clawcast.forecast import (
     apply_cost_estimation,
     daily_token_moving_average,
     detect_anomalies,
@@ -12,7 +12,7 @@ from openclaw_telemetry_forecast.forecast import (
     model_latency_percentiles,
     month_end_forecast,
 )
-from openclaw_telemetry_forecast.rates import ModelRate
+from oh_my_open_clawcast.rates import ModelRate
 
 
 def _sample_df(days: int = 20) -> pd.DataFrame:

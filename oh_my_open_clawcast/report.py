@@ -88,7 +88,7 @@ def render_html_report(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OpenClaw Telemetry Forecast Report</title>
+  <title>Oh My Open Clawcast Report</title>
   <style>
     body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 24px; color: #1f2937; }}
     h1, h2 {{ margin: 0 0 12px 0; }}
@@ -108,7 +108,7 @@ def render_html_report(
   </style>
 </head>
 <body>
-  <h1>OpenClaw Telemetry Forecast Report</h1>
+  <h1>Oh My Open Clawcast Report</h1>
   <div class="meta">generated: {generated_at.isoformat()}</div>
 
   <div class="grid">

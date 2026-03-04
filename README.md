@@ -1,4 +1,4 @@
-# OpenClaw Telemetry Forecast
+# Oh My Open Clawcast
 
 Standalone analytics/forecast toolkit for OpenClaw cron logs.
 
@@ -18,7 +18,7 @@ This project is intentionally **outside core OpenClaw** so it can move faster as
 ## Install
 
 ```bash
-cd openclaw-telemetry-forecast
+cd oh-my-open-clawcast
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -27,13 +27,13 @@ pip install -e .
 
 ```bash
 # show rate table
-oc-forecast table rates
+clawcast table rates
 
 # model latency table
-oc-forecast table latency --dir ~/.openclaw
+clawcast table latency --dir ~/.openclaw
 
 # full HTML report
-oc-forecast report --dir ~/.openclaw --out examples/forecast_report.html
+clawcast report --dir ~/.openclaw --out examples/forecast_report.html
 ```
 
 ## Custom price table
@@ -58,7 +58,7 @@ Create `rates.json`:
 Then:
 
 ```bash
-oc-forecast report --rates rates.json --out examples/forecast_report_custom_rates.html
+clawcast report --rates rates.json --out examples/forecast_report_custom_rates.html
 ```
 
 ## Output preview options

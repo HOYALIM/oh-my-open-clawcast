@@ -1,4 +1,4 @@
-"""OpenClaw telemetry forecast toolkit."""
+"""Oh My Open Clawcast telemetry forecast toolkit."""
 
 from .loader import load_cron_runs
 from .forecast import (

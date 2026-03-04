@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "openclaw-telemetry-forecast"
+name = "oh-my-open-clawcast"
 version = "0.1.0"
-description = "Telemetry + forecast analytics for OpenClaw cron/session logs"
+description = "Telemetry + forecast analytics for OpenClaw cron/session logs (Oh My Open Clawcast)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -18,7 +18,8 @@ dependencies = [
 ]
 
 [project.scripts]
-oc-forecast = "openclaw_telemetry_forecast.cli:main"
+clawcast = "oh_my_open_clawcast.cli:main"
+oc-forecast = "oh_my_open_clawcast.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "."}

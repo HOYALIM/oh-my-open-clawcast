@@ -109,7 +109,7 @@ def cmd_table(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="oc-forecast", description="OpenClaw telemetry forecast toolkit")
+    p = argparse.ArgumentParser(prog="clawcast", description="Oh My Open Clawcast telemetry forecast toolkit")
     p.add_argument("--dir", help="OpenClaw state dir (defaults to env or ~/.openclaw)")
     p.add_argument("--rates", help="JSON file with model pricing table")
     p.add_argument("--job", help="Optional cron job id filter")
