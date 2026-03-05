@@ -48,7 +48,7 @@ clawcast table rates
 clawcast table latency --dir ~/.openclaw
 
 # full HTML report
-clawcast report --dir ~/.openclaw --out examples/forecast_report.html
+clawcast report --dir ~/.openclaw --tz Asia/Seoul --out examples/forecast_report.html
 
 # messenger default summary text (/clawcast output payload)
 clawcast message --dir ~/.openclaw --tz Asia/Seoul
@@ -130,6 +130,7 @@ Notes:
 1. If live OpenClaw logs are missing, scripts fall back to demo report generation by default.
 2. Set `ALLOW_DEMO_FALLBACK=0` to force live-log-only behavior.
 3. Set `DRY_RUN=1` to test end-to-end without sending any external requests.
+4. Telegram/Slack send scripts now fail fast when provider APIs return success HTTP but logical failure payloads.
 
 ## Slash-command mapping
 

@@ -134,7 +134,7 @@ class UsageAggregator:
         return self._period_summary(subset, start_local=start_local, end_local=now_local)
 
     def forecast(self, lookback_days: int = 14) -> dict:
-        return month_end_forecast(self._df, lookback_days=lookback_days, now=self._now_utc)
+        return month_end_forecast(self._df, lookback_days=lookback_days, now=self._now_utc, tz=str(self._tz))
 
     def alerts(self, z_threshold: float = 2.5, failure_sigma: float = 2.0) -> list[dict]:
         anomalies = detect_anomalies(self._df, z_threshold=z_threshold, failure_sigma=failure_sigma)

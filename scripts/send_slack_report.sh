@@ -30,6 +30,37 @@ REPORT_PUBLIC_URL="${REPORT_PUBLIC_URL:-}"
 mkdir -p "${OUT_DIR}"
 source "${VENV_ACTIVATE}"
 
+check_slack_webhook_ok() {
+  local response_file="$1"
+  local response
+  response="$(cat "${response_file}")"
+  if [[ "${response}" != "ok" ]]; then
+    echo "Slack webhook returned unexpected response:"
+    cat "${response_file}"
+    exit 1
+  fi
+}
+
+check_slack_api_ok() {
+  local response_file="$1"
+  if ! python - "$response_file" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+if data.get("ok") is not True:
+    print(json.dumps(data, ensure_ascii=False))
+    raise SystemExit(1)
+PY
+  then
+    echo "Slack API returned failure payload:"
+    cat "${response_file}"
+    exit 1
+  fi
+}
+
 REPORT_CMD=(clawcast report --dir "${OPENCLAW_DIR}" --out "${REPORT_HTML}")
 MESSAGE_CMD=(clawcast message --dir "${OPENCLAW_DIR}")
 if [[ -n "${RATES_FILE}" ]]; then
@@ -88,6 +119,7 @@ if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
   curl -fsS -X POST -H "Content-type: application/json" \
     --data "{\"text\":\"${ESCAPED_TEXT//$'\n'/\\n}\"}" \
     "${SLACK_WEBHOOK_URL}" >/tmp/clawcast_slack_webhook_resp.txt
+  check_slack_webhook_ok /tmp/clawcast_slack_webhook_resp.txt
 fi
 
 if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_CHANNEL:-}" ]]; then
@@ -98,6 +130,7 @@ if [[ -n "${SLACK_BOT_TOKEN:-}" && -n "${SLACK_CHANNEL:-}" ]]; then
     -F "initial_comment=${MSG_HEADER}
 ${SHORT_MESSAGE}" \
     -F "file=@${REPORT_HTML}" >/tmp/clawcast_slack_upload_resp.json
+  check_slack_api_ok /tmp/clawcast_slack_upload_resp.json
 fi
 
 echo "Sent Slack report: ${REPORT_HTML}"

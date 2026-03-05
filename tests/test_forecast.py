@@ -70,6 +70,42 @@ def test_month_end_forecast_fields() -> None:
     assert fc["month_cost_forecast"] >= fc["month_cost_actual"]
 
 
+def test_month_end_forecast_respects_timezone_boundaries() -> None:
+    now_utc = datetime(2026, 2, 28, 16, 0, tzinfo=timezone.utc)  # 2026-03-01 01:00 Asia/Seoul
+    df = pd.DataFrame(
+        [
+            {
+                "timestamp": datetime(2026, 2, 28, 15, 30, tzinfo=timezone.utc),  # 2026-03-01 00:30 KST
+                "status": "ok",
+                "duration_ms": 500,
+                "provider": "openai",
+                "model": "gpt-4o",
+                "input_tokens": 100,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 100,
+            },
+            {
+                "timestamp": datetime(2026, 2, 28, 14, 30, tzinfo=timezone.utc),  # 2026-02-28 23:30 KST
+                "status": "ok",
+                "duration_ms": 500,
+                "provider": "openai",
+                "model": "gpt-4o",
+                "input_tokens": 999,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 999,
+            },
+        ]
+    )
+    out = apply_cost_estimation(df)
+    fc = month_end_forecast(out, lookback_days=7, now=now_utc, tz="Asia/Seoul")
+    assert fc["days_elapsed"] == 1
+    assert fc["month_tokens_actual"] == 100.0
+
+
 def test_anomaly_detection_token_spike() -> None:
     df = _sample_df()
     # Inject abnormal spike

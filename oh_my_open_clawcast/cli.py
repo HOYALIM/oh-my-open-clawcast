@@ -82,7 +82,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     latency = model_latency_percentiles(df2)
     ma = daily_token_moving_average(df2, windows=(7, 30))
     cost = model_cost_summary(df2)
-    forecast = month_end_forecast(df2, lookback_days=args.lookback)
+    forecast = month_end_forecast(df2, lookback_days=args.lookback, tz=args.tz)
     anomalies = detect_anomalies(df2, z_threshold=args.z_threshold, failure_sigma=args.failure_sigma)
 
     out = render_html_report(
@@ -196,6 +196,7 @@ def build_parser() -> argparse.ArgumentParser:
     rep = sub.add_parser("report", help="Generate full HTML forecast report")
     _add_common_args(rep)
     rep.add_argument("--out", default="examples/forecast_report.html")
+    rep.add_argument("--tz", default=_default_timezone(), help="Timezone for month/day boundaries")
     rep.add_argument("--lookback", type=int, default=14)
     rep.add_argument("--z-threshold", type=float, default=2.5)
     rep.add_argument("--failure-sigma", type=float, default=2.0)

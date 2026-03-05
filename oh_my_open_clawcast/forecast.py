@@ -4,6 +4,7 @@ import calendar
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Dict, Iterable
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -135,6 +136,7 @@ def month_end_forecast(
     df_with_cost: pd.DataFrame,
     lookback_days: int = 14,
     now: datetime | None = None,
+    tz: str = "UTC",
 ) -> dict:
     """
     Forecast month-end tokens and cost using average daily usage over recent lookback window.
@@ -153,17 +155,21 @@ def month_end_forecast(
             "month_cost_forecast": 0.0,
         }
 
-    now_dt = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
-    first_day = now_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    last_day_num = calendar.monthrange(now_dt.year, now_dt.month)[1]
-    last_day = now_dt.replace(day=last_day_num, hour=23, minute=59, second=59, microsecond=999999)
+    tz_info = ZoneInfo(tz)
+    now_utc = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
+    now_local = now_utc.astimezone(tz_info)
+    first_day_local = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_day_num = calendar.monthrange(now_local.year, now_local.month)[1]
+    last_day_local = now_local.replace(day=last_day_num, hour=23, minute=59, second=59, microsecond=999999)
 
-    month_df = data[(data["timestamp"] >= first_day) & (data["timestamp"] <= last_day)].copy()
+    start_utc = first_day_local.astimezone(timezone.utc)
+    end_utc = last_day_local.astimezone(timezone.utc)
+    month_df = data[(data["timestamp"] >= start_utc) & (data["timestamp"] <= end_utc)].copy()
     if month_df.empty:
         return {
             "lookback_days": lookback_days,
-            "days_elapsed": now_dt.day,
-            "days_remaining": max(last_day_num - now_dt.day, 0),
+            "days_elapsed": now_local.day,
+            "days_remaining": max(last_day_num - now_local.day, 0),
             "month_tokens_actual": 0.0,
             "month_cost_actual": 0.0,
             "daily_tokens_avg_recent": 0.0,
@@ -172,7 +178,7 @@ def month_end_forecast(
             "month_cost_forecast": 0.0,
         }
 
-    month_df["date"] = month_df["timestamp"].dt.date
+    month_df["date"] = month_df["timestamp"].dt.tz_convert(tz_info).dt.date
     month_df["total_tokens"] = pd.to_numeric(month_df.get("total_tokens"), errors="coerce").fillna(0)
     month_df["estimated_cost_usd"] = pd.to_numeric(month_df.get("estimated_cost_usd"), errors="coerce").fillna(0)
 
@@ -181,7 +187,7 @@ def month_end_forecast(
         daily_cost=("estimated_cost_usd", "sum"),
     )
 
-    cutoff = (now_dt - pd.Timedelta(days=lookback_days - 1)).date()
+    cutoff = (now_local - pd.Timedelta(days=lookback_days - 1)).date()
     recent = daily[daily["date"] >= cutoff]
     if recent.empty:
         recent = daily
@@ -189,13 +195,13 @@ def month_end_forecast(
     avg_tokens = float(recent["daily_tokens"].mean())
     avg_cost = float(recent["daily_cost"].mean())
 
-    days_remaining = max(last_day_num - now_dt.day, 0)
+    days_remaining = max(last_day_num - now_local.day, 0)
     month_tokens_actual = float(daily["daily_tokens"].sum())
     month_cost_actual = float(daily["daily_cost"].sum())
 
     return {
         "lookback_days": lookback_days,
-        "days_elapsed": now_dt.day,
+        "days_elapsed": now_local.day,
         "days_remaining": days_remaining,
         "month_tokens_actual": month_tokens_actual,
         "month_cost_actual": month_cost_actual,

@@ -30,6 +30,26 @@ REPORT_HTML="${REPORT_HTML:-${OUT_DIR}/clawcast_${STAMP}.html}"
 mkdir -p "${OUT_DIR}"
 source "${VENV_ACTIVATE}"
 
+check_telegram_ok() {
+  local response_file="$1"
+  if ! python - "$response_file" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+if data.get("ok") is not True:
+    print(json.dumps(data, ensure_ascii=False))
+    raise SystemExit(1)
+PY
+  then
+    echo "Telegram API returned failure payload:"
+    cat "${response_file}"
+    exit 1
+  fi
+}
+
 REPORT_CMD=(clawcast report --dir "${OPENCLAW_DIR}" --out "${REPORT_HTML}")
 MESSAGE_CMD=(clawcast message --dir "${OPENCLAW_DIR}")
 if [[ -n "${RATES_FILE}" ]]; then
@@ -82,11 +102,13 @@ fi
 curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
   -d "chat_id=${TELEGRAM_CHAT_ID}" \
   --data-urlencode "text=${MESSAGE_TEXT}" >/tmp/clawcast_tg_message_resp.json
+check_telegram_ok /tmp/clawcast_tg_message_resp.json
 
 if [[ "${SEND_REPORT_DOC}" == "1" ]]; then
   curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
     -F "chat_id=${TELEGRAM_CHAT_ID}" \
     -F "document=@${REPORT_HTML}" >/tmp/clawcast_tg_doc_resp.json
+  check_telegram_ok /tmp/clawcast_tg_doc_resp.json
 fi
 
 echo "Sent Telegram report: ${REPORT_HTML}"
