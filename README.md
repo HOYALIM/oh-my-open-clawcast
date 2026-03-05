@@ -17,6 +17,20 @@ This project is intentionally **outside core OpenClaw** so it can move faster as
 
 ## Install
 
+One-line install (recommended):
+
+```bash
+bash -lc "$(curl -fsSL https://raw.githubusercontent.com/HOYALIM/oh-my-open-clawcast/main/scripts/install.sh)"
+```
+
+Then verify:
+
+```bash
+clawcast --help
+```
+
+Local editable install (for development):
+
 ```bash
 cd oh-my-open-clawcast
 pip install -r requirements.txt
