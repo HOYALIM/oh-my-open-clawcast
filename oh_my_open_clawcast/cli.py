@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
@@ -24,6 +25,18 @@ from .loader import load_cron_runs
 from .quota import QuotaResolver
 from .rates import DEFAULT_MODEL_RATES, ModelRate
 from .report import render_html_report
+
+
+def _default_timezone() -> str:
+    env = os.environ.get("CLAWCAST_TZ")
+    if env and env.strip():
+        return env.strip()
+    local_tz = datetime.now().astimezone().tzinfo
+    if local_tz is not None:
+        key = getattr(local_tz, "key", None)
+        if isinstance(key, str) and key.strip():
+            return key
+    return "UTC"
 
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
@@ -120,11 +133,8 @@ def cmd_table(args: argparse.Namespace) -> int:
 def cmd_message(args: argparse.Namespace) -> int:
     rates = _load_rate_file(args.rates)
     df = load_cron_runs(openclaw_dir=args.dir, job_id=args.job)
-    if df.empty:
-        print("No cron run logs found.")
-        return 1
 
-    tz_name = args.tz or "UTC"
+    tz_name = args.tz or _default_timezone()
     now_local = datetime.now(ZoneInfo(tz_name))
 
     agg = UsageAggregator(
@@ -200,7 +210,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     msg = sub.add_parser("message", help="Print messenger-friendly /clawcast default summary text")
     _add_common_args(msg)
-    msg.add_argument("--tz", default="UTC", help="Timezone for daily/month boundaries, e.g. Asia/Seoul")
+    msg.add_argument("--tz", default=_default_timezone(), help="Timezone for daily/month boundaries, e.g. Asia/Seoul")
     msg.add_argument("--lookback", type=int, default=14, help="Forecast lookback days")
     msg.add_argument("--z-threshold", type=float, default=2.5)
     msg.add_argument("--failure-sigma", type=float, default=2.0)

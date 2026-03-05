@@ -64,12 +64,22 @@ def apply_cost_estimation(
     df: pd.DataFrame,
     rates: Dict[str, ModelRate] | None = None,
 ) -> pd.DataFrame:
-    """Attach per-run estimated USD cost using a model/provider token rate table."""
+    """Attach per-run estimated USD costs using model/provider token rates.
+
+    Billing policy:
+    - `theoretical_api_cost_usd`: cost if the run were billed as API.
+    - `estimated_cost_usd`: effective billable cost for current auth mode.
+      For `auth_mode=oauth`, default is 0 (assume plan-covered unless overage model is provided).
+    """
     table = rates or DEFAULT_MODEL_RATES
     out = df.copy()
 
     for col in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"):
         out[col] = pd.to_numeric(out.get(col), errors="coerce").fillna(0)
+
+    if "auth_mode" not in out.columns:
+        out["auth_mode"] = "api"
+    out["auth_mode"] = out["auth_mode"].astype(str).str.lower().fillna("api")
 
     estimated: list[float] = []
     rate_keys: list[str | None] = []
@@ -90,7 +100,11 @@ def apply_cost_estimation(
         )
         estimated.append(cost)
 
-    out["estimated_cost_usd"] = estimated
+    out["theoretical_api_cost_usd"] = estimated
+    out["estimated_cost_usd"] = [
+        0.0 if str(auth).lower() == "oauth" else float(cost)
+        for auth, cost in zip(out["auth_mode"], estimated, strict=False)
+    ]
     out["rate_key"] = rate_keys
     return out
 

@@ -19,7 +19,7 @@ class QuotaResult:
     limit_tokens: Optional[int]
     used_tokens: Optional[int]
     remaining_tokens: Optional[int]
-    confidence: str  # live | cached | manual
+    confidence: str  # snapshot | cached | manual
     updated_at: str
 
 
@@ -63,7 +63,7 @@ def _parse_override(raw: dict) -> Optional[QuotaOverride]:
 
 
 class QuotaResolver:
-    """Resolve quota with fallback order: live(file) -> cache -> manual(file)."""
+    """Resolve quota with fallback order: snapshot(file) -> cache -> manual(file)."""
 
     def __init__(
         self,
@@ -118,10 +118,10 @@ class QuotaResolver:
             limit_tokens=override.limit_tokens,
             used_tokens=override.used_tokens,
             remaining_tokens=remaining,
-            confidence="live",
+            confidence="snapshot",
             updated_at=updated,
         )
-        logger.info("quota resolved from live source for %s/%s (%s)", provider, model, auth_mode)
+        logger.info("quota resolved from snapshot source for %s/%s (%s)", provider, model, auth_mode)
         return result
 
     def _cache_lookup(self, provider: str, model: str, auth_mode: str) -> Optional[QuotaResult]:

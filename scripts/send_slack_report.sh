@@ -20,7 +20,7 @@ OUT_DIR="${OUT_DIR:-${ROOT_DIR}/out}"
 RATES_FILE="${RATES_FILE:-}"
 ALLOW_DEMO_FALLBACK="${ALLOW_DEMO_FALLBACK:-1}"
 DRY_RUN="${DRY_RUN:-0}"
-TZ_NAME="${TZ_NAME:-UTC}"
+TZ_NAME="${TZ_NAME:-}"
 QUOTA_LIVE_FILE="${QUOTA_LIVE_FILE:-}"
 QUOTA_MANUAL_FILE="${QUOTA_MANUAL_FILE:-}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
@@ -31,10 +31,13 @@ mkdir -p "${OUT_DIR}"
 source "${VENV_ACTIVATE}"
 
 REPORT_CMD=(clawcast report --dir "${OPENCLAW_DIR}" --out "${REPORT_HTML}")
-MESSAGE_CMD=(clawcast message --dir "${OPENCLAW_DIR}" --tz "${TZ_NAME}")
+MESSAGE_CMD=(clawcast message --dir "${OPENCLAW_DIR}")
 if [[ -n "${RATES_FILE}" ]]; then
   REPORT_CMD+=(--rates "${RATES_FILE}")
   MESSAGE_CMD+=(--rates "${RATES_FILE}")
+fi
+if [[ -n "${TZ_NAME}" ]]; then
+  MESSAGE_CMD+=(--tz "${TZ_NAME}")
 fi
 if [[ -n "${QUOTA_LIVE_FILE}" ]]; then
   MESSAGE_CMD+=(--quota-live-file "${QUOTA_LIVE_FILE}")
@@ -56,9 +59,10 @@ if ! "${REPORT_CMD[@]}" >/tmp/clawcast_report_stdout.txt 2>/tmp/clawcast_report_
   fi
 fi
 
-MESSAGE_TEXT="$("${MESSAGE_CMD[@]}" 2>&1 || true)"
-if [[ -z "${MESSAGE_TEXT}" ]]; then
-  MESSAGE_TEXT="[Clawcast] no output"
+if ! MESSAGE_TEXT="$("${MESSAGE_CMD[@]}" 2>&1)"; then
+  echo "Message generation failed:"
+  echo "${MESSAGE_TEXT}"
+  exit 1
 fi
 if [[ "${REPORT_MODE}" == "demo" ]]; then
   MESSAGE_TEXT="${MESSAGE_TEXT}

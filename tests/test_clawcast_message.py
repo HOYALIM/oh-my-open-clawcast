@@ -12,6 +12,7 @@ from oh_my_open_clawcast.formatter import render_clawcast_message
 from oh_my_open_clawcast.loader import infer_auth_mode, load_cron_runs
 from oh_my_open_clawcast.quota import QuotaResolver
 from oh_my_open_clawcast.rates import ModelRate
+from oh_my_open_clawcast import cli as clawcast_cli
 
 
 def test_infer_auth_mode_prefers_explicit_oauth() -> None:
@@ -144,7 +145,7 @@ def test_quota_resolver_fallback_live_cached_manual(tmp_path: Path) -> None:
 
     first = resolver.resolve("openai", "gpt-4o", "api")
     assert first is not None
-    assert first.confidence == "live"
+    assert first.confidence == "snapshot"
     assert first.used_tokens == 250
 
     # Remove live data, cached result should be used.
@@ -296,3 +297,36 @@ def test_missing_data_graceful_handling() -> None:
     )
     assert "[Clawcast]" in message
     assert "no data" in message.lower() or "0" in message
+
+
+def test_oauth_cost_defaults_to_zero_but_tracks_theoretical_api_cost() -> None:
+    now_utc = datetime(2026, 3, 4, 6, 0, 0, tzinfo=timezone.utc)
+    df = pd.DataFrame(
+        [
+            {
+                "timestamp": now_utc,
+                "status": "ok",
+                "provider": "openai",
+                "model": "gpt-4o",
+                "auth_mode": "oauth",
+                "duration_ms": 500,
+                "input_tokens": 1_000_000,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 1_000_000,
+            }
+        ]
+    )
+    out = apply_cost_estimation(df, rates={"openai/gpt-4o": ModelRate(input_per_1m=5, output_per_1m=15)})
+    assert float(out.iloc[0]["theoretical_api_cost_usd"]) == 5.0
+    assert float(out.iloc[0]["estimated_cost_usd"]) == 0.0
+
+
+def test_cmd_message_returns_success_for_empty_dir(tmp_path: Path, capsys) -> None:
+    parser = clawcast_cli.build_parser()
+    args = parser.parse_args(["message", "--dir", str(tmp_path), "--tz", "UTC"])
+    rc = clawcast_cli.cmd_message(args)
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "[Clawcast]" in captured.out

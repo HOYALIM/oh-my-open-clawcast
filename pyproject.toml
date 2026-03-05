@@ -13,8 +13,7 @@ authors = [{ name = "HoYALIM" }]
 dependencies = [
   "pandas>=2.0",
   "numpy>=1.24",
-  "matplotlib>=3.7",
-  "pyarrow>=14.0"
+  "matplotlib>=3.7"
 ]
 
 [project.scripts]

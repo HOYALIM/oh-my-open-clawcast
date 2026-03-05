@@ -145,8 +145,14 @@ The output already includes:
 2. Month-to-date usage (from 1st day 00:00)
 3. Model/auth mode (API vs OAuth), tokens, cost, latency p50/p95
 4. Month-end projection
-5. Quota status with confidence (`live`/`cached`/`manual`)
+5. Quota status with confidence (`snapshot`/`cached`/`manual`)
 6. Alerts
+
+Cost policy note:
+
+1. `auth_mode=api`: billed using token rate table.
+2. `auth_mode=oauth`: default billed cost is `0` (assumed plan-covered).
+3. `theoretical_api_cost_usd` is still tracked internally for comparison/reporting.
 
 ## Recommended multi-AI workflow (you + Codex + Claude Code + Gemini)
 
