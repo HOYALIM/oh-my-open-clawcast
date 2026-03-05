@@ -15,8 +15,12 @@ from oh_my_open_clawcast.rates import ModelRate
 
 
 def test_infer_auth_mode_prefers_explicit_oauth() -> None:
+    # Keep this matrix strict so auth classification regressions are caught quickly.
     entry = {"authMode": "OAuth"}
     assert infer_auth_mode(entry, provider="openai", model="gpt-4o") == "oauth"
+    assert infer_auth_mode({"authMode": "API"}, provider="openai", model="gpt-4o") == "api"
+    assert infer_auth_mode({"oauth": True}, provider="openai", model="gpt-4o") == "oauth"
+    assert infer_auth_mode({}, provider="openai", model="gpt-4o") == "api"
 
 
 def test_loader_reads_auth_mode_and_defaults_api(tmp_path: Path) -> None:
