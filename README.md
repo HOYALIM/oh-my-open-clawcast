@@ -17,10 +17,11 @@ This project is intentionally **outside core OpenClaw** so it can move faster as
 
 ## Install
 
-One-line install (recommended):
+Homebrew (recommended):
 
 ```bash
-bash -lc "$(curl -fsSL https://raw.githubusercontent.com/HOYALIM/oh-my-open-clawcast/main/scripts/install.sh)"
+brew tap HOYALIM/oh-my-open-clawcast https://github.com/HOYALIM/oh-my-open-clawcast
+brew install clawcast
 ```
 
 Then verify:
